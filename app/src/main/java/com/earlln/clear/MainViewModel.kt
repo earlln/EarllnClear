@@ -3,7 +3,10 @@ package com.earlln.clear
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.earlln.clear.data.ApkAnalyzer
+import com.earlln.clear.data.ApkInfo
 import com.earlln.clear.data.DuplicateFinder
+import com.earlln.clear.data.FileCategory
 import com.earlln.clear.data.DuplicateGroup
 import com.earlln.clear.data.JunkFinder
 import com.earlln.clear.data.JunkResult
@@ -42,6 +45,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val scan = MutableStateFlow<Task<ScanResult>>(Task.Idle)
     val duplicates = MutableStateFlow<Task<List<DuplicateGroup>>>(Task.Idle)
     val junk = MutableStateFlow<Task<JunkResult>>(Task.Idle)
+    val apks = MutableStateFlow<Task<List<ApkInfo>>>(Task.Idle)
     val trashItems = MutableStateFlow<List<TrashEntry>>(emptyList())
     val storage = MutableStateFlow(StorageScanner.StorageInfo(0, 0))
     val organizePlan = MutableStateFlow<List<MovePlan>?>(null)
@@ -72,6 +76,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun rescan() {
         duplicates.value = Task.Idle
         junk.value = Task.Idle
+        apks.value = Task.Idle
         viewModelScope.launch { ensureScan(force = true) }
     }
 
@@ -106,6 +111,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun findApks() {
+        viewModelScope.launch {
+            val s = ensureScan()
+            apks.value = Task.Running(text = "설치 파일 분석 중…")
+            val list = withContext(Dispatchers.IO) {
+                ApkAnalyzer.analyze(getApplication<Application>(), s.files.filter { it.category == FileCategory.APK })
+            }
+            apks.value = Task.Done(list)
+        }
+    }
+
     /** 공통: 선택 파일을 휴지통으로 이동하고 모든 결과 목록에서 제거 */
     fun moveToTrash(paths: Set<String>) = runBusy {
         val moved = trash.moveToTrash(paths)
@@ -137,6 +153,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         junk.value.dataOrNull()?.let { j ->
             junk.value = Task.Done(j.copy(tempFiles = j.tempFiles.filterNot { it.path in paths }))
         }
+        apks.value.dataOrNull()?.let { a ->
+            apks.value = Task.Done(a.filterNot { it.file.path in paths })
+        }
         refreshStorage()
     }
 
@@ -147,6 +166,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         scan.value = Task.Idle // 경로가 바뀌었으므로 다음에 다시 스캔
         duplicates.value = Task.Idle
         junk.value = Task.Idle
+        apks.value = Task.Idle
         _messages.tryEmit("${n}개를 원래 위치로 복원했습니다.")
     }
 
@@ -174,6 +194,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         scan.value = Task.Idle
         duplicates.value = Task.Idle
         junk.value = Task.Idle
+        apks.value = Task.Idle
         _messages.tryEmit("${n}개 파일을 분류했습니다.")
     }
 
@@ -183,6 +204,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         scan.value = Task.Idle
         duplicates.value = Task.Idle
         junk.value = Task.Idle
+        apks.value = Task.Idle
         _messages.tryEmit("${n}개 파일을 원래 위치로 되돌렸습니다.")
     }
 

@@ -88,6 +88,9 @@ fun HomeScreen(vm: MainViewModel, onOpen: (Screen) -> Unit) {
                 FeatureCard("🧹", "빈 폴더 · 임시파일", "빈 폴더와 임시/미완료 다운로드 파일을 청소합니다") { onOpen(Screen.JUNK) }
             }
             item {
+                FeatureCard("📦", "APK 정리", "이미 설치했거나 예전 버전인 설치 파일을 찾습니다") { onOpen(Screen.APK) }
+            }
+            item {
                 FeatureCard("🗂️", "자동 분류", "폴더 속 파일을 종류·날짜별 폴더로 정리합니다") { onOpen(Screen.ORGANIZE) }
             }
             item {

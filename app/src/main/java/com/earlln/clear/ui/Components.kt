@@ -65,19 +65,21 @@ fun FileRow(
     subtitle: String = "${formatSize(item.size)} · ${formatDate(item.lastModified)}",
     showFolder: Boolean = true,
     enabled: Boolean = true,
+    title: String = item.name,
+    openOnClick: Boolean = true,
 ) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { openFile(ctx, item.path) }
+            .clickable(enabled = openOnClick) { openFile(ctx, item.path) }
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Checkbox(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
         Text(item.category.emoji, Modifier.padding(end = 8.dp))
         Column(Modifier.weight(1f)) {
-            Text(item.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (showFolder) {
                 Text(

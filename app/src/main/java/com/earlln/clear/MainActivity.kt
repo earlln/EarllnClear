@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.earlln.clear.ui.ApkScreen
 import com.earlln.clear.ui.ClearTheme
 import com.earlln.clear.ui.DuplicatesScreen
 import com.earlln.clear.ui.HomeScreen
@@ -63,6 +64,7 @@ private fun AppRoot() {
         Screen.OLD -> LargeOldScreen(vm, large = false, onBack = back)
         Screen.JUNK -> JunkScreen(vm, back)
         Screen.ORGANIZE -> OrganizeScreen(vm, back)
+        Screen.APK -> ApkScreen(vm, back)
         Screen.TRASH -> TrashScreen(vm, back)
     }
 }
