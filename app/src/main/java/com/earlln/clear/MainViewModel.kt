@@ -49,6 +49,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val trashItems = MutableStateFlow<List<TrashEntry>>(emptyList())
     val storage = MutableStateFlow(StorageScanner.StorageInfo(0, 0))
     val organizePlan = MutableStateFlow<List<MovePlan>?>(null)
+    val organizeFolders = MutableStateFlow<List<StorageScanner.FolderCount>?>(null)
     val canUndoOrganize = MutableStateFlow(false)
     val busy = MutableStateFlow(false)
 
@@ -178,6 +179,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---- 자동 분류 ----
+    fun loadOrganizeFolders() {
+        viewModelScope.launch(Dispatchers.IO) { organizeFolders.value = StorageScanner.organizableFolders() }
+    }
+
     fun planOrganize(dir: File, mode: OrganizeMode) = runBusy {
         organizePlan.value = organizer.plan(dir, mode)
     }
@@ -195,6 +200,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         duplicates.value = Task.Idle
         junk.value = Task.Idle
         apks.value = Task.Idle
+        organizeFolders.value = StorageScanner.organizableFolders()
         _messages.tryEmit("${n}개 파일을 분류했습니다.")
     }
 
@@ -205,6 +211,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         duplicates.value = Task.Idle
         junk.value = Task.Idle
         apks.value = Task.Idle
+        organizeFolders.value = StorageScanner.organizableFolders()
         _messages.tryEmit("${n}개 파일을 원래 위치로 되돌렸습니다.")
     }
 

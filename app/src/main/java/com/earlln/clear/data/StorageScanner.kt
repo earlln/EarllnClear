@@ -56,11 +56,17 @@ object StorageScanner {
         StorageInfo(0, 0)
     }
 
-    /** 자동 분류 대상으로 고를 수 있는 최상위 폴더 목록 */
-    fun topLevelFolders(): List<File> {
+    data class FolderCount(val path: String, val name: String, val fileCount: Int)
+
+    /** 자동 분류 대상: 바로 아래에 (숨김이 아닌) 파일이 있는 최상위 폴더만 */
+    fun organizableFolders(): List<FolderCount> {
         val list = root.listFiles { f -> f.isDirectory && !f.name.startsWith(".") && f.name != "Android" }
+            ?.mapNotNull { d ->
+                val n = d.listFiles { f -> f.isFile && !f.name.startsWith(".") }?.size ?: 0
+                if (n > 0) FolderCount(d.absolutePath, d.name, n) else null
+            }
             ?.sortedBy { it.name.lowercase() } ?: emptyList()
-        val download = list.filter { it.name == Environment.DIRECTORY_DOWNLOADS }
-        return download + (list - download.toSet())
+        // Download 폴더를 맨 앞에
+        return list.sortedBy { if (it.name == Environment.DIRECTORY_DOWNLOADS) 0 else 1 }
     }
 }

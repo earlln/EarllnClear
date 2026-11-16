@@ -19,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,12 +30,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.earlln.clear.MainViewModel
 import com.earlln.clear.data.OrganizeMode
-import com.earlln.clear.data.StorageScanner
 
 @Composable
 fun OrganizeScreen(vm: MainViewModel, onBack: () -> Unit) {
-    val folders = remember { StorageScanner.topLevelFolders() }
-    var folderPath by rememberSaveable { mutableStateOf(folders.firstOrNull()?.absolutePath) }
+    val foldersState by vm.organizeFolders.collectAsState()
+    val folders = foldersState.orEmpty()
+    var chosenPath by rememberSaveable { mutableStateOf<String?>(null) }
+    // 선택한 폴더가 목록에서 사라지면(분류 완료 등) 첫 폴더로
+    val folderPath = chosenPath?.takeIf { p -> folders.any { it.path == p } } ?: folders.firstOrNull()?.path
+    LaunchedEffect(Unit) { vm.loadOrganizeFolders() }
     var mode by rememberSaveable { mutableStateOf(OrganizeMode.BY_TYPE) }
     val plan by vm.organizePlan.collectAsState()
     val busy by vm.busy.collectAsState()
@@ -59,16 +63,24 @@ fun OrganizeScreen(vm: MainViewModel, onBack: () -> Unit) {
                 Modifier.padding(16.dp),
                 style = MaterialTheme.typography.bodySmall,
             )
-            Text("① 정리할 폴더", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleSmall)
+            Text("① 정리할 폴더 (괄호 안은 정리할 파일 수)", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleSmall)
+            if (foldersState != null && folders.isEmpty()) {
+                Text(
+                    "정리할 파일이 있는 폴더가 없습니다 ✨",
+                    Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(folders, key = { it.absolutePath }) { f ->
+                items(folders, key = { it.path }) { f ->
                     FilterChip(
-                        selected = folderPath == f.absolutePath,
-                        onClick = { folderPath = f.absolutePath; vm.clearPlan() },
-                        label = { Text(f.name) },
+                        selected = folderPath == f.path,
+                        onClick = { chosenPath = f.path; vm.clearPlan() },
+                        label = { Text("${f.name} (${f.fileCount})") },
                     )
                 }
             }
