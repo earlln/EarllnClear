@@ -32,7 +32,7 @@ object DuplicateFinder {
                 }
                 byFull.forEach { (h, g) ->
                     if (h != null && g.size > 1) {
-                        result.add(DuplicateGroup(h, g.sortedBy { it.lastModified }))
+                        result.add(DuplicateGroup(h, g.sortedWith(keepOrder)))
                     }
                 }
             }
@@ -41,6 +41,21 @@ object DuplicateFinder {
         }
         return result.sortedByDescending { it.wasted }
     }
+
+    private val copySuffix = Regex("""(\s*\(\d+\)|\s*-\s*복사본|[ _-]copy( \d+)?)$""", RegexOption.IGNORE_CASE)
+
+    private fun folderRank(f: FileItem): Int = when {
+        "/DCIM/" in f.path + "/" -> 0      // 카메라 촬영 원본
+        "/Download" in f.parent -> 2       // 다시 받은 사본이 많이 생기는 곳
+        else -> 1
+    }
+
+    /** 원본으로 보이는 파일이 맨 앞에 오도록 정렬: 카메라 폴더 > (1)·복사본 아닌 이름 > 오래된 파일 */
+    private val keepOrder = compareBy<FileItem>(
+        { folderRank(it) },
+        { if (copySuffix.containsMatchIn(it.name.substringBeforeLast('.'))) 1 else 0 },
+        { it.lastModified },
+    )
 
     private fun hash(path: String, limit: Number): String? = try {
         val md = MessageDigest.getInstance("SHA-256")
