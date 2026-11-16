@@ -29,7 +29,6 @@ import com.earlln.clear.Task
 import com.earlln.clear.dataOrNull
 import com.earlln.clear.data.FileItem
 import com.earlln.clear.data.Settings
-import com.earlln.clear.data.SettingsStore
 import com.earlln.clear.data.formatSize
 import java.util.concurrent.TimeUnit
 
