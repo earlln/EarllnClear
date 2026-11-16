@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.earlln.clear.MainViewModel
+import com.earlln.clear.data.SettingsStore
 import com.earlln.clear.Task
 import com.earlln.clear.dataOrNull
 import com.earlln.clear.data.formatDate
@@ -102,7 +103,7 @@ fun DuplicatesScreen(vm: MainViewModel, onBack: () -> Unit) {
     if (confirm) {
         ConfirmDialog(
             "휴지통으로 이동",
-            "${selected.size}개 파일(${formatSize(selectedSize)})을 휴지통으로 옮깁니다.\n30일 안에는 휴지통에서 복원할 수 있습니다.",
+            "${selected.size}개 파일(${formatSize(selectedSize)})을 휴지통으로 옮깁니다.\n${SettingsStore.current.trashDays}일 안에는 휴지통에서 복원할 수 있습니다.",
             "이동",
             onConfirm = { vm.moveToTrash(selected) },
             onDismiss = { confirm = false },

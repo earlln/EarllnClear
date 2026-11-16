@@ -15,22 +15,20 @@ data class TrashEntry(
     val deletedAt: Long,
 ) {
     val name: String get() = originalPath.substringAfterLast('/')
-    val daysLeft: Int
-        get() {
-            val elapsed = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - deletedAt)
-            return (TrashManager.KEEP_DAYS - elapsed).toInt().coerceAtLeast(0)
-        }
+    fun daysLeft(keepDays: Int): Int {
+        val elapsed = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - deletedAt)
+        return (keepDays - elapsed).toInt().coerceAtLeast(0)
+    }
 }
 
 /**
  * 앱 전용 휴지통. 파일을 내부 저장소의 숨김 폴더로 "이동"만 하므로
- * 30일 이내에는 언제든 원래 위치로 복원할 수 있다.
+ * 보관 기간(설정, 기본 30일) 안에는 언제든 원래 위치로 복원할 수 있다.
  * 색인(index.json)도 휴지통 폴더 안에 두어 앱을 재설치해도 유지된다.
  */
 class TrashManager(private val context: Context) {
 
     companion object {
-        const val KEEP_DAYS = 30L
         val trashDir: File get() = File(StorageScanner.root, ".EarllnClearTrash")
         private val lock = Any()
     }
@@ -121,9 +119,9 @@ class TrashManager(private val context: Context) {
         n
     }
 
-    /** 보관 기간(30일)이 지난 항목 영구 삭제 */
-    fun purgeExpired(): Int {
-        val limit = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(KEEP_DAYS)
+    /** 보관 기간이 지난 항목 영구 삭제 */
+    fun purgeExpired(keepDays: Int = SettingsStore.current.trashDays): Int {
+        val limit = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(keepDays.toLong())
         val expired = synchronized(lock) { load() }.filter { it.deletedAt < limit }.map { it.id }
         return if (expired.isEmpty()) 0 else deleteForever(expired)
     }

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.earlln.clear.MainViewModel
+import com.earlln.clear.data.SettingsStore
 import com.earlln.clear.Task
 import com.earlln.clear.data.ApkAnalyzer
 import com.earlln.clear.data.ApkInfo
@@ -148,7 +149,7 @@ fun ApkScreen(vm: MainViewModel, onBack: () -> Unit) {
     if (confirm) {
         ConfirmDialog(
             "휴지통으로 이동",
-            "APK ${selected.size}개(${formatSize(selectedSize)})를 휴지통으로 옮깁니다.\n설치된 앱에는 영향이 없고, 30일 안에는 복원할 수 있습니다.",
+            "APK ${selected.size}개(${formatSize(selectedSize)})를 휴지통으로 옮깁니다.\n설치된 앱에는 영향이 없고, ${SettingsStore.current.trashDays}일 안에는 복원할 수 있습니다.",
             "이동",
             onConfirm = { vm.moveToTrash(selected) },
             onDismiss = { confirm = false },

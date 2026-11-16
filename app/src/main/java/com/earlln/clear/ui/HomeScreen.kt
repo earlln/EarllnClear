@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.earlln.clear.MainViewModel
 import com.earlln.clear.Task
+import com.earlln.clear.data.SettingsStore
 import com.earlln.clear.data.formatSize
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,6 +49,9 @@ fun HomeScreen(vm: MainViewModel, onOpen: (Screen) -> Unit) {
             actions = {
                 IconButton(onClick = { vm.rescan() }, enabled = scan !is Task.Running) {
                     Icon(Icons.Filled.Refresh, contentDescription = "다시 스캔")
+                }
+                IconButton(onClick = { onOpen(Screen.SETTINGS) }) {
+                    Icon(Icons.Filled.Settings, contentDescription = "설정")
                 }
             },
         )
@@ -95,7 +100,7 @@ fun HomeScreen(vm: MainViewModel, onOpen: (Screen) -> Unit) {
             }
             item {
                 val summary = if (trashItems.isEmpty()) "비어 있음"
-                else "${trashItems.size}개 · ${formatSize(trashItems.sumOf { it.size })} (30일 후 자동 삭제)"
+                else "${trashItems.size}개 · ${formatSize(trashItems.sumOf { it.size })} (${SettingsStore.current.trashDays}일 후 자동 삭제)"
                 FeatureCard("🗑️", "휴지통", summary) { onOpen(Screen.TRASH) }
             }
         }

@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.earlln.clear.MainViewModel
 import com.earlln.clear.data.FileCategory
+import com.earlln.clear.data.SettingsStore
 import com.earlln.clear.data.formatDate
 import com.earlln.clear.data.formatSize
 
@@ -36,6 +37,7 @@ import com.earlln.clear.data.formatSize
 fun TrashScreen(vm: MainViewModel, onBack: () -> Unit) {
     val items by vm.trashItems.collectAsState()
     val busy by vm.busy.collectAsState()
+    val settings by SettingsStore.flow.collectAsState()
     var selected by remember(items) { mutableStateOf(emptySet<String>()) }
     var confirmDelete by remember { mutableStateOf<Set<String>?>(null) }
     val selSize = items.filter { it.id in selected }.sumOf { it.size }
@@ -71,7 +73,7 @@ fun TrashScreen(vm: MainViewModel, onBack: () -> Unit) {
                 EmptyView("휴지통이 비어 있습니다")
             } else {
                 Text(
-                    "${items.size}개 · ${formatSize(items.sumOf { it.size })}\n휴지통의 파일은 30일이 지나면 자동으로 영구 삭제됩니다.",
+                    "${items.size}개 · ${formatSize(items.sumOf { it.size })}\n휴지통의 파일은 ${settings.trashDays}일이 지나면 자동으로 영구 삭제됩니다.",
                     Modifier.padding(16.dp),
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -89,7 +91,7 @@ fun TrashScreen(vm: MainViewModel, onBack: () -> Unit) {
                             Column(Modifier.weight(1f)) {
                                 Text(e.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(
-                                    "${formatSize(e.size)} · ${formatDate(e.deletedAt)} 삭제 · ${e.daysLeft}일 후 영구 삭제",
+                                    "${formatSize(e.size)} · ${formatDate(e.deletedAt)} 삭제 · ${e.daysLeft(settings.trashDays)}일 후 영구 삭제",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )

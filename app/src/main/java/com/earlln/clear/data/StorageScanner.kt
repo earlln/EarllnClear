@@ -17,7 +17,7 @@ object StorageScanner {
             p == TrashManager.trashDir.absolutePath
     }
 
-    fun scan(onProgress: (Int) -> Unit): ScanResult {
+    fun scan(skipHidden: Boolean = false, onProgress: (Int) -> Unit): ScanResult {
         val files = ArrayList<FileItem>(4096)
         val dirs = ArrayList<String>(1024)
         val stack = ArrayDeque<File>()
@@ -28,7 +28,7 @@ object StorageScanner {
             val children = dir.listFiles() ?: continue
             for (c in children) {
                 if (c.isDirectory) {
-                    if (!isExcluded(c)) {
+                    if (!isExcluded(c) && !(skipHidden && c.name.startsWith("."))) {
                         dirs.add(c.absolutePath)
                         stack.addLast(c)
                     }
@@ -56,17 +56,36 @@ object StorageScanner {
         StorageInfo(0, 0)
     }
 
-    data class FolderCount(val path: String, val name: String, val fileCount: Int)
+    data class FolderCount(val path: String, val fileCount: Int) {
+        val relative: String get() = path.removePrefix(root.absolutePath + "/")
+    }
 
-    /** 자동 분류 대상: 바로 아래에 (숨김이 아닌) 파일이 있는 최상위 폴더만 */
-    fun organizableFolders(): List<FolderCount> {
-        val list = root.listFiles { f -> f.isDirectory && !f.name.startsWith(".") && f.name != "Android" }
-            ?.mapNotNull { d ->
-                val n = d.listFiles { f -> f.isFile && !f.name.startsWith(".") }?.size ?: 0
-                if (n > 0) FolderCount(d.absolutePath, d.name, n) else null
+    /**
+     * 자동 분류 대상 폴더: 바로 아래에 (숨김이 아닌) 파일이 있는 폴더.
+     * - 숨김 폴더, Android 폴더 안은 항상 제외
+     * - includeSubfolders=false 이면 최상위 폴더만
+     * - excludeCamera=true 이면 DCIM(카메라) 폴더 전체 제외
+     */
+    fun organizableFolders(scan: ScanResult, includeSubfolders: Boolean, excludeCamera: Boolean): List<FolderCount> {
+        val rootPath = root.absolutePath
+        return scan.files.asSequence()
+            .filter { !it.name.startsWith(".") }
+            .groupingBy { it.parent }.eachCount()
+            .mapNotNull { (dir, n) ->
+                if (!dir.startsWith("$rootPath/")) return@mapNotNull null
+                val segs = dir.removePrefix("$rootPath/").split('/')
+                when {
+                    segs.first() == "Android" -> null
+                    segs.any { it.startsWith(".") } -> null
+                    !includeSubfolders && segs.size > 1 -> null
+                    excludeCamera && segs.first() == Environment.DIRECTORY_DCIM -> null
+                    else -> FolderCount(dir, n)
+                }
             }
-            ?.sortedBy { it.name.lowercase() } ?: emptyList()
-        // Download 폴더를 맨 앞에
-        return list.sortedBy { if (it.name == Environment.DIRECTORY_DOWNLOADS) 0 else 1 }
+            .sortedWith(
+                compareBy<FolderCount>({ if (it.relative == Environment.DIRECTORY_DOWNLOADS) 0 else 1 })
+                    .thenByDescending { it.fileCount }
+                    .thenBy { it.relative.lowercase() }
+            )
     }
 }

@@ -10,13 +10,18 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.earlln.clear.data.ThemeMode
 
 private val Light = lightColorScheme(primary = Color(0xFF1E6FD9), secondary = Color(0xFF3D8B6E))
 private val Dark = darkColorScheme(primary = Color(0xFF8AB8FF), secondary = Color(0xFF8BD3B5))
 
 @Composable
-fun ClearTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+fun ClearTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
+    val dark = when (mode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
     val ctx = LocalContext.current
     val scheme = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->

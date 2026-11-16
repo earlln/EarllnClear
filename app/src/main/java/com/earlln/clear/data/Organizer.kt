@@ -1,6 +1,8 @@
 package com.earlln.clear.data
 
 import android.content.Context
+import android.media.ExifInterface
+import android.media.MediaMetadataRetriever
 import android.media.MediaScannerConnection
 import org.json.JSONArray
 import org.json.JSONObject
@@ -8,6 +10,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 enum class OrganizeMode(val label: String) {
     BY_TYPE("종류별"),
@@ -29,11 +32,16 @@ class Organizer(private val context: Context) {
     private val logFile get() = File(context.filesDir, "organize_last.json")
     private val monthFmt = SimpleDateFormat("yyyy-MM", Locale.ROOT)
 
-    fun plan(sourceDir: File, mode: OrganizeMode): List<MovePlan> {
+    fun plan(sourceDir: File, mode: OrganizeMode, dateSource: DateSource = DateSource.TAKEN_FIRST): List<MovePlan> {
         val files = sourceDir.listFiles { f -> f.isFile && !f.name.startsWith(".") } ?: return emptyList()
         return files.sortedBy { it.name.lowercase() }.map { f ->
             val item = FileItem.from(f)
-            val month = monthFmt.format(Date(item.lastModified))
+            val date = if (mode != OrganizeMode.BY_TYPE && dateSource == DateSource.TAKEN_FIRST) {
+                takenDate(item) ?: item.lastModified
+            } else {
+                item.lastModified
+            }
+            val month = monthFmt.format(Date(date))
             val sub = when (mode) {
                 OrganizeMode.BY_TYPE -> item.category.label
                 OrganizeMode.BY_DATE -> month
@@ -41,6 +49,34 @@ class Organizer(private val context: Context) {
             }
             MovePlan(f.absolutePath, File(File(sourceDir, sub), f.name).absolutePath)
         }
+    }
+
+    /** 사진(EXIF)·동영상(메타데이터)의 촬영일. 없으면 null */
+    private fun takenDate(item: FileItem): Long? = try {
+        when (item.category) {
+            FileCategory.IMAGE -> {
+                val exif = ExifInterface(item.path)
+                val raw = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
+                    ?: exif.getAttribute(ExifInterface.TAG_DATETIME)
+                raw?.let { SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.ROOT).parse(it)?.time }
+            }
+            FileCategory.VIDEO -> {
+                val r = MediaMetadataRetriever()
+                try {
+                    r.setDataSource(item.path)
+                    r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DATE)?.let {
+                        SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.ROOT).apply {
+                            timeZone = TimeZone.getTimeZone("UTC")
+                        }.parse(it.take(15))?.time
+                    }
+                } finally {
+                    r.release()
+                }
+            }
+            else -> null
+        }?.takeIf { it > 31_536_000_000L } // 1971년 이전(잘못된 값)은 무시
+    } catch (e: Exception) {
+        null
     }
 
     /** 계획대로 이동. 이동된 개수 반환 */

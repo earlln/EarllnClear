@@ -1,6 +1,11 @@
 package com.earlln.clear.ui
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +16,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -26,11 +36,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.earlln.clear.MainViewModel
 import com.earlln.clear.data.OrganizeMode
+import com.earlln.clear.data.SettingsStore
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrganizeScreen(vm: MainViewModel, onBack: () -> Unit) {
     val foldersState by vm.organizeFolders.collectAsState()
@@ -38,7 +51,14 @@ fun OrganizeScreen(vm: MainViewModel, onBack: () -> Unit) {
     var chosenPath by rememberSaveable { mutableStateOf<String?>(null) }
     // 선택한 폴더가 목록에서 사라지면(분류 완료 등) 첫 폴더로
     val folderPath = chosenPath?.takeIf { p -> folders.any { it.path == p } } ?: folders.firstOrNull()?.path
-    LaunchedEffect(Unit) { vm.loadOrganizeFolders() }
+    LaunchedEffect(foldersState == null) { if (foldersState == null) vm.loadOrganizeFolders() }
+    var showPicker by remember { mutableStateOf(false) }
+    val settings by SettingsStore.flow.collectAsState()
+    val settingsHint = buildString {
+        append(if (settings.includeSubfolders) "하위 폴더 포함" else "최상위 폴더만")
+        if (settings.excludeCamera) append(" · 카메라(DCIM) 제외")
+        append(" · 날짜 기준: ${settings.dateSource.label}  (설정에서 변경)")
+    }
     var mode by rememberSaveable { mutableStateOf(OrganizeMode.BY_TYPE) }
     val plan by vm.organizePlan.collectAsState()
     val busy by vm.busy.collectAsState()
@@ -59,31 +79,49 @@ fun OrganizeScreen(vm: MainViewModel, onBack: () -> Unit) {
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             Text(
-                "선택한 폴더 바로 아래에 있는 파일만 하위 폴더로 옮깁니다. 실행 후 '되돌리기'로 원래대로 돌릴 수 있습니다.",
+                "선택한 폴더 바로 아래에 있는 파일을 종류·날짜별 하위 폴더로 옮깁니다. 실행 후 '되돌리기'로 원래대로 돌릴 수 있습니다.",
                 Modifier.padding(16.dp),
                 style = MaterialTheme.typography.bodySmall,
             )
-            Text("① 정리할 폴더 (괄호 안은 정리할 파일 수)", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleSmall)
-            if (foldersState != null && folders.isEmpty()) {
-                Text(
+            Text("① 정리할 폴더", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleSmall)
+            when {
+                foldersState == null -> Text(
+                    "폴더 확인 중…",
+                    Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                folders.isEmpty() -> Text(
                     "정리할 파일이 있는 폴더가 없습니다 ✨",
                     Modifier.padding(16.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(folders, key = { it.path }) { f ->
-                    FilterChip(
-                        selected = folderPath == f.path,
-                        onClick = { chosenPath = f.path; vm.clearPlan() },
-                        label = { Text("${f.name} (${f.fileCount})") },
-                    )
+                else -> {
+                    val cur = folders.firstOrNull { it.path == folderPath }
+                    OutlinedCard(
+                        onClick = { showPicker = true },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("📁 ${cur?.relative ?: "선택"}", style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    "정리할 파일 ${cur?.fileCount ?: 0}개 · 눌러서 폴더 바꾸기 (전체 ${folders.size}개)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text("▾", style = MaterialTheme.typography.titleLarge)
+                        }
+                    }
                 }
             }
+            Text(
+                settingsHint,
+                Modifier.padding(horizontal = 16.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
             Text("② 분류 방식", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleSmall)
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -143,6 +181,34 @@ fun OrganizeScreen(vm: MainViewModel, onBack: () -> Unit) {
             "실행",
             onConfirm = { vm.executeOrganize() },
             onDismiss = { confirm = false },
+        )
+    }
+    if (showPicker) {
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            title = { Text("정리할 폴더 선택") },
+            text = {
+                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                    folders.forEach { f ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    chosenPath = f.path
+                                    vm.clearPlan()
+                                    showPicker = false
+                                }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = f.path == folderPath, onClick = null)
+                            Text(f.relative, Modifier.weight(1f).padding(start = 8.dp))
+                            Text("${f.fileCount}개", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showPicker = false }) { Text("닫기") } },
         )
     }
     if (confirmUndo) {

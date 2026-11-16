@@ -14,10 +14,11 @@ import com.earlln.clear.data.MovePlan
 import com.earlln.clear.data.OrganizeMode
 import com.earlln.clear.data.Organizer
 import com.earlln.clear.data.ScanResult
+import com.earlln.clear.data.Settings
+import com.earlln.clear.data.SettingsStore
 import com.earlln.clear.data.StorageScanner
 import com.earlln.clear.data.TrashEntry
 import com.earlln.clear.data.TrashManager
-import com.earlln.clear.data.formatSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -86,7 +87,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (!force && cur is Task.Done) return cur.data
         scan.value = Task.Running(text = "파일 확인 중…")
         val r = withContext(Dispatchers.IO) {
-            StorageScanner.scan { n -> scan.value = Task.Running(text = "파일 ${n}개 확인") }
+            StorageScanner.scan(SettingsStore.current.skipHidden) { n -> scan.value = Task.Running(text = "파일 ${n}개 확인") }
         }
         scan.value = Task.Done(r)
         r
@@ -98,7 +99,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val files = ensureScan().files
             duplicates.value = Task.Running(0f, "같은 파일 비교 중…")
             val groups = withContext(Dispatchers.IO) {
-                DuplicateFinder.find(files) { p -> duplicates.value = Task.Running(p, "같은 파일 비교 중…") }
+                val st = SettingsStore.current
+                DuplicateFinder.find(files, st.keepRule, st.dupMinSize) { p -> duplicates.value = Task.Running(p, "같은 파일 비교 중…") }
             }
             duplicates.value = Task.Done(groups)
         }
@@ -180,11 +182,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- 자동 분류 ----
     fun loadOrganizeFolders() {
-        viewModelScope.launch(Dispatchers.IO) { organizeFolders.value = StorageScanner.organizableFolders() }
+        viewModelScope.launch {
+            val s = ensureScan()
+            val st = SettingsStore.current
+            organizeFolders.value = withContext(Dispatchers.Default) {
+                StorageScanner.organizableFolders(s, st.includeSubfolders, st.excludeCamera)
+            }
+        }
     }
 
     fun planOrganize(dir: File, mode: OrganizeMode) = runBusy {
-        organizePlan.value = organizer.plan(dir, mode)
+        organizePlan.value = organizer.plan(dir, mode, SettingsStore.current.dateSource)
     }
 
     fun clearPlan() {
@@ -200,7 +208,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         duplicates.value = Task.Idle
         junk.value = Task.Idle
         apks.value = Task.Idle
-        organizeFolders.value = StorageScanner.organizableFolders()
+        organizeFolders.value = null
+        loadOrganizeFolders()
         _messages.tryEmit("${n}개 파일을 분류했습니다.")
     }
 
@@ -211,8 +220,45 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         duplicates.value = Task.Idle
         junk.value = Task.Idle
         apks.value = Task.Idle
-        organizeFolders.value = StorageScanner.organizableFolders()
+        organizeFolders.value = null
+        loadOrganizeFolders()
         _messages.tryEmit("${n}개 파일을 원래 위치로 되돌렸습니다.")
+    }
+
+    // ---- 설정 ----
+    /** 설정 변경 후, 영향을 받는 결과만 다시 계산하도록 초기화 */
+    fun updateSettings(transform: (Settings) -> Settings) {
+        val old = SettingsStore.current
+        SettingsStore.update(transform)
+        applySettingsChange(old, SettingsStore.current)
+    }
+
+    fun resetSettings() {
+        val old = SettingsStore.current
+        SettingsStore.reset()
+        applySettingsChange(old, SettingsStore.current)
+    }
+
+    private fun applySettingsChange(old: Settings, new: Settings) {
+        if (old.skipHidden != new.skipHidden) {
+            scan.value = Task.Idle
+            duplicates.value = Task.Idle
+            junk.value = Task.Idle
+            apks.value = Task.Idle
+            organizeFolders.value = null
+        }
+        if (old.keepRule != new.keepRule || old.dupMinSize != new.dupMinSize) {
+            dupJob?.cancel()
+            duplicates.value = Task.Idle
+        }
+        if (old.includeSubfolders != new.includeSubfolders || old.excludeCamera != new.excludeCamera) {
+            organizeFolders.value = null
+            organizePlan.value = null
+        }
+        if (old.dateSource != new.dateSource) organizePlan.value = null
+        if (old.trashDays != new.trashDays) {
+            viewModelScope.launch(Dispatchers.IO) { trashItems.value = trash.list() }
+        }
     }
 
     private fun runBusy(block: suspend () -> Unit) {
@@ -229,8 +275,4 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun trashSummary(): String {
-        val items = trashItems.value
-        return if (items.isEmpty()) "비어 있음" else "${items.size}개 · ${formatSize(items.sumOf { it.size })}"
-    }
 }

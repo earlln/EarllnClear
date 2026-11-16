@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,13 +27,18 @@ import com.earlln.clear.ui.LargeOldScreen
 import com.earlln.clear.ui.OrganizeScreen
 import com.earlln.clear.ui.PermissionScreen
 import com.earlln.clear.ui.Screen
+import com.earlln.clear.ui.SettingsScreen
+import com.earlln.clear.data.SettingsStore
 import com.earlln.clear.ui.TrashScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { ClearTheme { AppRoot() } }
+        setContent {
+            val settings by SettingsStore.flow.collectAsState()
+            ClearTheme(settings.theme) { AppRoot() }
+        }
     }
 }
 
@@ -66,5 +72,6 @@ private fun AppRoot() {
         Screen.ORGANIZE -> OrganizeScreen(vm, back)
         Screen.APK -> ApkScreen(vm, back)
         Screen.TRASH -> TrashScreen(vm, back)
+        Screen.SETTINGS -> SettingsScreen(vm, back)
     }
 }

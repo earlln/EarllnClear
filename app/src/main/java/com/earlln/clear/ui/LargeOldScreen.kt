@@ -24,9 +24,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.earlln.clear.MainViewModel
+import com.earlln.clear.data.SettingsStore
 import com.earlln.clear.Task
 import com.earlln.clear.dataOrNull
 import com.earlln.clear.data.FileItem
+import com.earlln.clear.data.Settings
+import com.earlln.clear.data.SettingsStore
 import com.earlln.clear.data.formatSize
 import java.util.concurrent.TimeUnit
 
@@ -39,11 +42,13 @@ fun LargeOldScreen(vm: MainViewModel, large: Boolean, onBack: () -> Unit) {
     val busy by vm.busy.collectAsState()
 
     val options: List<Pair<String, Long>> = if (large) {
-        listOf("50MB 이상" to 50 * MB, "100MB 이상" to 100 * MB, "500MB 이상" to 500 * MB, "1GB 이상" to 1024 * MB)
+        Settings.LARGE_OPTIONS.map { it.first to it.second * MB }
     } else {
-        listOf("6개월 이상" to 182L, "1년 이상" to 365L, "2년 이상" to 730L, "3년 이상" to 1095L)
+        Settings.OLD_OPTIONS
     }
-    var optIdx by rememberSaveable { mutableIntStateOf(1) }
+    var optIdx by rememberSaveable(large) {
+        mutableIntStateOf(if (large) SettingsStore.current.largeDefault else SettingsStore.current.oldDefault)
+    }
     val threshold = options[optIdx].second
 
     val files: List<FileItem> = remember(scan, optIdx) {
@@ -111,7 +116,7 @@ fun LargeOldScreen(vm: MainViewModel, large: Boolean, onBack: () -> Unit) {
     if (confirm) {
         ConfirmDialog(
             "휴지통으로 이동",
-            "${selected.size}개 파일(${formatSize(selectedSize)})을 휴지통으로 옮깁니다.\n30일 안에는 휴지통에서 복원할 수 있습니다.",
+            "${selected.size}개 파일(${formatSize(selectedSize)})을 휴지통으로 옮깁니다.\n${SettingsStore.current.trashDays}일 안에는 휴지통에서 복원할 수 있습니다.",
             "이동",
             onConfirm = { vm.moveToTrash(selected) },
             onDismiss = { confirm = false },

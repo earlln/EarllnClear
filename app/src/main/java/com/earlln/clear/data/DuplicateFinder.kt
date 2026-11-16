@@ -14,8 +14,18 @@ import kotlin.coroutines.coroutineContext
 object DuplicateFinder {
     private const val PARTIAL = 64 * 1024
 
-    suspend fun find(files: List<FileItem>, onProgress: (Float) -> Unit): List<DuplicateGroup> {
-        val bySize = files.filter { it.size > 0 }.groupBy { it.size }.values.filter { it.size > 1 }
+    suspend fun find(
+        files: List<FileItem>,
+        rule: KeepRule = KeepRule.SMART,
+        minSize: Long = 0,
+        onProgress: (Float) -> Unit,
+    ): List<DuplicateGroup> {
+        val order = when (rule) {
+            KeepRule.SMART -> keepOrder
+            KeepRule.OLDEST -> compareBy<FileItem> { it.lastModified }
+            KeepRule.NEWEST -> compareByDescending<FileItem> { it.lastModified }
+        }
+        val bySize = files.filter { it.size > 0 && it.size >= minSize }.groupBy { it.size }.values.filter { it.size > 1 }
         val total = bySize.sumOf { it.size }.coerceAtLeast(1)
         var done = 0
         val result = ArrayList<DuplicateGroup>()
@@ -32,7 +42,7 @@ object DuplicateFinder {
                 }
                 byFull.forEach { (h, g) ->
                     if (h != null && g.size > 1) {
-                        result.add(DuplicateGroup(h, g.sortedWith(keepOrder)))
+                        result.add(DuplicateGroup(h, g.sortedWith(order)))
                     }
                 }
             }
